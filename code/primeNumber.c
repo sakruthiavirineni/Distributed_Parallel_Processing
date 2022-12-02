@@ -1,59 +1,79 @@
+//Description:
+
+// we desired to check the effect on CPU using the openMPI by mimicing the pipe architecture.
+// we designed in such a way that, the process scale without compiling
+
+// headers used in the program
 #include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 
-#define first_prime 2 // First prime number
-#define MASTER_START_INT 1 // First integer in the master process' int set
-int debug = 0; // Trigger for debug statements
+#define first_prime 2
+#define MASTER_START_INT 1
+int debug = 0;
 
 // Signature for method which distributes the work
 void divideTheWork(int*, int*,
                     unsigned long*,
                     unsigned int*, unsigned int*, unsigned int*,
                     unsigned int*, unsigned int*, unsigned int*);
-
+// Main
+// Takes the command arguments, if any, to determine when the program
+// should stop finding primes and whether debug statements should be
+// printed.  Each MPI processor then determines which set of integers
+// that process is responsible for, allocates and initializes an array
+// for that set of integers, and crosses off multiples for each prime
+// number broadcasted by the master process.  The master process
+// will always have all integers up to the sqrt(N) but can have more work
+// if there are too few processes for a very large N.  The master process
+// also crosses off multiples in its list and broadcasts the next uncrossed
+// integer until it hits the last integer in the set.  Finally, at the end,
+// through MPI_Reduce, all processes count how many primes they have in
+// their array and report back to the master process.
+// (input) int argc     main argument count
+// (input) char** argv  main argument array
+//                        argv[1] = n (largest int to check)
+//                        argv[2] = "DEBUG" (to print debug statements)
+// (output) int         return code
+// return code 0        success
+// return code 1        failed to allocate memory for one of the processes
 int main(int argc, char** argv) {
 
-   unsigned long n = 4294967295; // Find all primes up to n
-   double timer; // Execution time
-   int p_count; // Number of processes
-   int p_id; // Get process rank
-   char processor_name[MPI_MAX_PROCESSOR_NAME]; // Stores process name
-   int name_len; // Stores process name length
+   unsigned long n = 4294967295; // primes till 1 to N
+   double timer; // variable to hold the time
+   int p_count; // counter for the processess
+   int p_id; // variable for storing the rank
+   char processor_name[MPI_MAX_PROCESSOR_NAME]; // array to store the names of the processess currently execueting
+   int name_len; // var to store the length of the name
 
-   unsigned int n_master; // Work for process 0
-   unsigned int n_worker; // Work for process 1+
-   unsigned int remainder; // Uneven remaining work
-   unsigned int p_work;  // Count of intgers in set
-   unsigned int p_first; // First integer in set
-   unsigned int p_last; // Last integer in set
-   unsigned int prime; // Current prime to remove multiples
-   int j; // General iterator;
-   int final_count; // Total number of primes found
-   char *mark_table; // Each process' integer marking table
-
-    MPI_Init(&argc, &argv); // Initialize MPI Environment
-  ////===================================================
-
-  //// Start Timer
+   unsigned int n_master; // as described, we are considering the process 0 as master
+   unsigned int n_worker; // the process after 1 are considered as
+   unsigned int remainder; // variable to store the uneven work
+   unsigned int p_work;  // counter variable for the set
+   unsigned int p_first; // id indicating the first variable in the set
+   unsigned int p_last; // id indicating the last variable in the set
+   unsigned int prime; // var to store the current prime
+   int j;
+   int final_count; // counter to store the total number of primes found till now
+   char *mark_table; // table for the process
+    
+    // initializing the environment
+    MPI_Init(&argc, &argv);
+    
+    // computing the time for the execution
     MPI_Barrier(MPI_COMM_WORLD);
     timer = -MPI_Wtime(); // start timer
 
-  //// Perform MPI Housekeeping
-    MPI_Comm_size(MPI_COMM_WORLD, &p_count);  // Get the number of processes
-    MPI_Comm_rank(MPI_COMM_WORLD, &p_id);  // Get the rank of the process
+    // code for the communicator ( grouping holding and ranking the processess)
+    MPI_Comm_size(MPI_COMM_WORLD, &p_count);
+    MPI_Comm_rank(MPI_COMM_WORLD, &p_id);
 
-  //// Check input arguments
-    if(argc >= 2) // Change upper range of domain
+    if(argc >= 2)
        n = strtoul(argv[1], NULL, 0);
-    if(argc == 3 && (argv[2] == "DEBUG") ) // Turn on debug mode
-    {
-       debug = 1;
-    }
 
- //// Determine work distributed to this process
-    distributeWork(&p_id, &p_count,
+
+    divideTheWork(&p_id, &p_count,
                    &n,
                    &p_last, &p_first, &p_work,
                    &n_master, &n_worker, &remainder);
@@ -64,7 +84,6 @@ int main(int argc, char** argv) {
        printf("Proc %d: Assigned %d (%d - %d)\n", p_id, p_work, p_first, p_last);
        MPI_Barrier(MPI_COMM_WORLD);
     }
-
 
   //// Allocate array for each process
     mark_table = (char*) malloc( sizeof(char)*p_work );
@@ -183,7 +202,27 @@ int main(int argc, char** argv) {
     MPI_Finalize();  // Finalize the MPI environment.
 }
 
-void distributeWork(int *p_id,
+
+// Distribute Work
+// This section of the code splits the workload, i.e. the total number of integers,
+// as evenly as possible between all processes.  First, the master process is given
+// all integers up to the sqrt(N).  Then, the rest of the work is divided among the
+// other processes.  If the other processes still have more work than the master
+// process, the work is re-divided back to give more work to master.  Remainders are
+// evenly distributed among worker processes at the end.  Finally, the starting and
+// ending integer in each set is determined.
+//
+// (input) int*          p_id           reference to this process' rank
+// (input) int*          p_count        reference to num of processes in communicator
+// (input) unsigned long* n             reference to total problem size
+// (input) unsigned int* p_last         reference to this process' last integer
+// (input) unsigned int* p_first        reference to this process' first integer
+// (input) unsigned int* p_work         reference to this process' total int in set
+// (input) unsigned int* n_master       reference to total work for master process
+// (input) unsigned int* n_worker       reference to total work per worker process
+// (input) unsigned int* remainder      reference to the remaining work, unevenly divided
+// (return)   none      all references are changed directly
+void divideTheWork(int *p_id,
                     int *p_count,
                     unsigned long *n,
                     unsigned int *p_last,
