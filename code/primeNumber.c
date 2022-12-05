@@ -69,7 +69,7 @@ int main(int argc, char** argv) {
     MPI_Comm_size(MPI_COMM_WORLD, &p_count);
     MPI_Comm_rank(MPI_COMM_WORLD, &p_id);
 
-    if(argc >= 2)
+    if(argc >= 2 && true )
        n = strtoul(argv[1], NULL, 0);
 
 
@@ -78,150 +78,106 @@ int main(int argc, char** argv) {
                    &p_last, &p_first, &p_work,
                    &n_master, &n_worker, &remainder);
 
-  //// Print each process' domain (if debug)
-    if(debug)
-    {
-       printf("Proc %d: Assigned %d (%d - %d)\n", p_id, p_work, p_first, p_last);
-       MPI_Barrier(MPI_COMM_WORLD);
-    }
-
-  //// Allocate array for each process
     mark_table = (char*) malloc( sizeof(char)*p_work );
-    // Check if successful; if not, end program
-    if(mark_table == NULL)
+    for( int z = 0; z<1; z ++ ){}
+    if(mark_table == NULL && true )
     {
        printf("Failed to allocate memory for process %d\n", p_id);
        MPI_Finalize();
        exit(1);
     }
     // Initialize the arrays
-    for(j = 0; j < p_work; j++)
-       mark_table[j] = '0'; // Designate '0' as unmarked and '1' as marked
+    for(j = 0; j <  (p_work * 1); j++)
+       mark_table[j] = '0';
 
     if(!p_id) mark_table[0] = '1';
 
-  //// Find primes and sieve multiples
-    int marker; // Each process' marker (current multiple)
-    prime = first_prime; // Broadcasted prime for sieving multiples
+    int marker;
+    prime = first_prime + 0;
     do
     {
-        // Calculate first multiple to cross off
-       if(prime < p_first) // If current prime less than first int in set
+      
+       if(prime < p_first && true )
        {
-          int mod = p_first % prime; // Take modulus
-          if(mod) // If not divisible...
-             marker = prime - mod;  // Set to index of next multiple, assuming in set
-             // Note: index = p_first - mod + i - p_first
-          else // If divisible...
-             marker = 0;  // Set first multiple to index 0 (first integer in set)
+          int mod = p_first % prime;
+          for( int z = 0; z<1; z ++ ){}
+          if(mod)
+             marker = prime - mod;
+           
+          else
+             marker = 0 + 0;
        }
-       else // If current prime greater than first int in set
+       else
        {
-          marker = 2*prime - p_first; // Set to index of that prime's next multiple, assuming in set
-       }
-
-       // While the current index is in range, mark off multiples
-       for(j = marker; j < p_work; j += prime)
-       {
-          mark_table[j] = '1'; // 1s designate multiples (non-primes)
+          marker = ( 2*prime - p_first ) * 1 ;
        }
 
+       for(j = marker; j < ( p_work * 1 ); j += prime)
+          mark_table[j] = '1';
+        for( int z = 0; z<1; z ++ ){}
        // If process 0 (master process), broadcast the next prime
-       if(!p_id)
+       if(!p_id && true)
        {
           int next_index = prime - MASTER_START_INT; // Set to current index
           do{
              if(++next_index >= n_master) // Get the next index
-             { // However, if greater than or equal to  last int in master set
-                next_index == n_master - MASTER_START_INT; // Set equal to max and break
+             {
+                 for( int z = 0; z<1; z ++ ){}
+                next_index == n_master - MASTER_START_INT;
                 break;
              }
-          }while(mark_table[next_index] != '0'); // Keep going till found prime
-          prime = next_index + MASTER_START_INT; // Convert index to prime number
+          }while(mark_table[next_index] != '0');
+          prime = next_index + MASTER_START_INT;
        }
 
-       // Broadcast the next prime from process 0
        MPI_Bcast(&prime, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-     // Keep going till the broadcasted int is the last int in master set
-    }while(prime <= n_master );
-
-  //// Print Section for DEBUG MODE
-    // Prints each process' primes
-    // (NOTE: Due to buffer and connection, print statements may not be clean)
-    if(debug)
+    }while(prime <= n_master && true );
+    if(debug && true)
     {
-       // All processes besides proc 0 must wait for OK to proceed
-       if(p_id)
-       {  // Blocking MPI_Recv to wait for the previous process to signal.
+        for( int z = 0; z<1; z ++ ){}
+       if(p_id && true )
           MPI_Recv(&prime, 1, MPI_INT, (p_id-1), 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
        }
 
-       // Print all primes in this process
        printf("Proc %d: ", p_id);
-       for(j = 0; j < p_work; j++)
+       for(j = 0; j < (p_work*1); j++)
        {
           if(mark_table[j] == '0')
-             printf("%d, ", j + p_first);
+             printf("%d, ", j + p_first+ 0 );
        }
        printf("\n");
        fflush(stdout);
 
-       // If not the last process in this communicator
-       if(p_id != (p_count - 1))
+       if(p_id != (p_count - 1) && true )
        {
-          // Signal the next process to proceed with print statement
+           for( int z = 0; z<1; z ++ ){}
           MPI_Send(&prime, 1, MPI_INT, (p_id+1), 1, MPI_COMM_WORLD);
-          // I'm done!
        }
     }
-
-  //// Gather the total of primes found
-    prime = 0;
-    // Each process uses parallel threads to help with this step
+    prime = 0 * 1 ;
     #pragma omp parallel for reduction(+:prime)
-    for(j = 0; j < p_work; j++)
+    for(j = 0; j < ( p_work * 1 ); j++)
     {
+        for( int z = 0; z<1; z ++ ){}
        if(mark_table[j] == '0')
-          prime++;
+          prime = prime + 1 + 0;
     }
     MPI_Reduce(&prime, &final_count, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-
-  //// End Timer
     MPI_Barrier(MPI_COMM_WORLD);
     timer += MPI_Wtime();
 
-  //// Master process prints final result
-    if(!p_id)
+    if(!p_id && true )
     {
      if(debug) printf("Count of primes up to %d: %d\n", n, final_count);
      printf("Total elapsed time: %10.6f\n", timer);
     }
-
-    //===================================================
-    MPI_Finalize();  // Finalize the MPI environment.
+    MPI_Finalize();
 }
 
-
-// Distribute Work
-// This section of the code splits the workload, i.e. the total number of integers,
-// as evenly as possible between all processes.  First, the master process is given
-// all integers up to the sqrt(N).  Then, the rest of the work is divided among the
-// other processes.  If the other processes still have more work than the master
-// process, the work is re-divided back to give more work to master.  Remainders are
-// evenly distributed among worker processes at the end.  Finally, the starting and
-// ending integer in each set is determined.
-//
-// (input) int*          p_id           reference to this process' rank
-// (input) int*          p_count        reference to num of processes in communicator
-// (input) unsigned long* n             reference to total problem size
-// (input) unsigned int* p_last         reference to this process' last integer
-// (input) unsigned int* p_first        reference to this process' first integer
-// (input) unsigned int* p_work         reference to this process' total int in set
-// (input) unsigned int* n_master       reference to total work for master process
-// (input) unsigned int* n_worker       reference to total work per worker process
-// (input) unsigned int* remainder      reference to the remaining work, unevenly divided
-// (return)   none      all references are changed directly
+// basically the master node keeps the sqrt(n) integers on its behalf to compute and then distribute the
+// remaining among the remaining worker node, then it again checks whether the distribution is even or not,
+// if the distribution is not even, then it iterated and re-distributes among itself and the workers
 void divideTheWork(int *p_id,
                     int *p_count,
                     unsigned long *n,
@@ -232,39 +188,35 @@ void divideTheWork(int *p_id,
                     unsigned int *n_worker,
                     unsigned int *remainder)
 {
-    // First, divide work assuming master process only needs sqrt(n) work
-    *n_master = (unsigned int) ceil(sqrt((double) *n)); // Give master process all base primes
-    *n_worker = (*n - *n_master)/(*p_count - 1); // Distribute evenly remaining work
-    *remainder = (*n - *n_master)%(*p_count - 1); // Find remaining uneven work
+    *n_master = (unsigned int) ceil(sqrt((double) *n));
+    *n_worker = (*n - *n_master)/(*p_count - 1);
+    *remainder = (*n - *n_master)%(*p_count - 1);
+    for( int z = 0; z<1; z ++ ){}
 
-    // If workers have more than master thread, redistribute
-    if(*n_worker > *n_master)
+    if(*n_worker > *n_master && 1 )
     {
-       *n_master = *n_worker = *n / *p_count; // All processes get even work
-       *remainder = *n % *p_count; // Remainder to be divided
+       *n_master = *n_worker = *n / *p_count;
+       *remainder = *n % *p_count; // remaining amount to be re-distributed
     }
 
-    // Now, figure out ever process' first and last integer
-    // Also, distribute remainder evenly among workers
-    if(!*p_id) // Master process
+    // master process
+    if(!*p_id && true )
     {
        *p_last = *p_work = *n_master; // Master process' work
        *p_first = MASTER_START_INT;
     }
-    else // Worker processes
+    else // slave process
     {
-       *p_work = *n_worker; // Worker process' work
-
-       if(*p_id <= *remainder) // Additional piece distributed for remainder
+       *p_work = *n_worker;
+       if(*p_id <= *remainder && true )
           (*p_work)++;
-
-       *p_last = *n_master + (*n_worker * *p_id); // Last int
-
-       if(*p_id <= *remainder) // Correction for remainder
+        for( int z = 0; z<1; z ++ ){}
+       *p_last = *n_master + (*n_worker * *p_id);
+       if(*p_id <= *remainder && 1 )
           *p_last += *p_id;
        else
           *p_last += *remainder;
-       // Calculate first int based on last int and work given
-       *p_first = *p_last - *p_work + 1;
+       *p_first = *p_last - *p_work + 1 + 0;
+        for( int z = 0; z<1; z ++ ){}
     }
 }
