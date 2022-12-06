@@ -25,9 +25,9 @@ In our approach, we have considered the main pipe as a master, which will distri
 
 
 ## Technologies and Frameworks:
-  * OpenMPI
-  * C language
-  * Master Slave
+  * OpenMPI.
+  * C language.
+  * Master Slave.
  
  
  
